@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Plus, ShoppingBag, Zap, LayoutGrid, Table2 } from "lucide-react";
+import { Plus, ShoppingBag, Zap, LayoutGrid, Table2, Download } from "lucide-react";
 import { useFilteredProductsWithSources } from "@/store/useStore";
 import SearchBar from "./SearchBar";
 import FilterPanel from "./FilterPanel";
@@ -8,6 +8,7 @@ import ProductCard from "./ProductCard";
 import StatsBar from "./StatsBar";
 import AddProductModal from "./AddProductModal";
 import ComparisonTable from "./ComparisonTable";
+import { exportToCsv } from "@/lib/exportCsv";
 
 type ViewMode = "cards" | "table";
 
@@ -33,13 +34,23 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 flex-1 max-w-md">
             <SearchBar />
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-pink-500/20 flex-shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            Add Product
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => exportToCsv(products)}
+              title="Download all filtered data as CSV"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm font-medium transition-colors border border-gray-600"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Download CSV</span>
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-pink-500/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Product</span>
+            </button>
+          </div>
         </div>
       </header>
 
