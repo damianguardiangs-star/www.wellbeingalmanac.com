@@ -1,16 +1,20 @@
 "use client";
 import { useState } from "react";
-import { Plus, ShoppingBag, Zap } from "lucide-react";
+import { Plus, ShoppingBag, Zap, LayoutGrid, Table2 } from "lucide-react";
 import { useFilteredProductsWithSources } from "@/store/useStore";
 import SearchBar from "./SearchBar";
 import FilterPanel from "./FilterPanel";
 import ProductCard from "./ProductCard";
 import StatsBar from "./StatsBar";
 import AddProductModal from "./AddProductModal";
+import ComparisonTable from "./ComparisonTable";
+
+type ViewMode = "cards" | "table";
 
 export default function Dashboard() {
   const products = useFilteredProductsWithSources();
   const [showModal, setShowModal] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -46,7 +50,7 @@ export default function Dashboard() {
         {/* Filters */}
         <FilterPanel />
 
-        {/* Results Count */}
+        {/* Results Count + View Toggle */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <ShoppingBag className="w-4 h-4" />
@@ -54,18 +58,51 @@ export default function Dashboard() {
               <span className="text-white font-medium">{products.length}</span> products found
             </span>
           </div>
-          <div className="text-xs text-gray-500">
-            Click a product to expand wholesale sources &amp; full P&amp;L
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 hidden sm:block">
+              {viewMode === "cards"
+                ? "Click a product to expand wholesale sources & full P&L"
+                : "Click column headers to sort"}
+            </span>
+            {/* View toggle buttons */}
+            <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode("cards")}
+                title="Card view"
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === "cards"
+                    ? "bg-pink-600 text-white shadow-sm shadow-pink-500/30"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("table")}
+                title="Table view"
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === "table"
+                    ? "bg-pink-600 text-white shadow-sm shadow-pink-500/30"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                <Table2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Product Grid */}
+        {/* Product Grid / Table */}
         {products.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          viewMode === "cards" ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          ) : (
+            <ComparisonTable products={products} />
+          )
         ) : (
           <div className="text-center py-20">
             <ShoppingBag className="w-12 h-12 text-gray-600 mx-auto mb-4" />
