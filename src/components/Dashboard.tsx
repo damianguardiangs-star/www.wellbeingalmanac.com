@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, ShoppingBag, Zap, LayoutGrid, Table2, Download } from "lucide-react";
-import { useFilteredProductsWithSources } from "@/store/useStore";
+import { useFilteredProductsWithSources, useStore } from "@/store/useStore";
 import SearchBar from "./SearchBar";
 import FilterPanel from "./FilterPanel";
 import ProductCard from "./ProductCard";
@@ -14,8 +14,11 @@ type ViewMode = "cards" | "table";
 
 export default function Dashboard() {
   const products = useFilteredProductsWithSources();
+  const { loading, apiError, loadFromApi } = useStore();
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
+
+  useEffect(() => { loadFromApi(); }, []);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -55,6 +58,18 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {apiError && (
+          <div className="bg-yellow-900/40 border border-yellow-700 text-yellow-300 text-sm px-4 py-2 rounded-lg">
+            API unavailable — showing local data. ({apiError})
+          </div>
+        )}
+
+        {loading && (
+          <div className="text-center py-4 text-gray-400 text-sm animate-pulse">
+            Loading from API…
+          </div>
+        )}
+
         {/* Stats */}
         <StatsBar products={products} />
 

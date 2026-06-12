@@ -1,0 +1,17 @@
+name = "wellbeing-almanac-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers free tier: 100k req/day
+# Paid tier: $5/month for 10M req, then $0.50/million
+# For low-traffic apps this is effectively ~$0.50/month or free
+
+[[kv_namespaces]]
+binding = "DB"
+# Run `wrangler kv namespace create DB` to create and fill in the id below
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
+
+[vars]
+ALLOWED_ORIGIN = "*"
