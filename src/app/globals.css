@@ -1,26 +1,88 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-forest-950: #071410;
+  --color-forest-900: #0d1f16;
+  --color-forest-800: #183323;
+  --color-forest-700: #1f4a30;
+  --color-forest-600: #2a6040;
+  --color-forest-500: #367a52;
+  --color-forest-400: #4a9868;
+  --color-forest-300: #70b88a;
+  --color-forest-200: #a3d4b4;
+  --color-forest-100: #d4eedd;
+  --color-forest-50: #eef7f1;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-cream-50: #faf7f0;
+  --color-cream-100: #f5f0e4;
+  --color-cream-200: #ede3cc;
+  --color-cream-300: #dfd0ad;
+  --color-cream-400: #c8b280;
+  --color-cream-500: #b09060;
+
+  --color-brass-300: #e8c84a;
+  --color-brass-400: #d4aa22;
+  --color-brass-500: #b8900e;
+  --color-brass-600: #9a7509;
+  --color-brass-700: #7a5c06;
+
+  --color-ink-900: #1a1a14;
+  --color-ink-800: #2a2a20;
+  --color-ink-700: #3d3d2e;
+  --color-ink-600: #555540;
+  --color-ink-400: #88886a;
+  --color-ink-300: #aaa888;
+  --color-ink-200: #cccaaa;
+  --color-ink-100: #e8e6d0;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #faf7f0;
+  --foreground: #1a1a14;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f0ece0;
+}
+::-webkit-scrollbar-thumb {
+  background: #c8b280;
+  border-radius: 3px;
+}
+
+/* Score bar */
+.score-bar {
+  height: 4px;
+  background: #e8e6d0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.score-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2a6040, #d4aa22);
+  border-radius: 2px;
+  transition: width 0.3s ease;
 }
