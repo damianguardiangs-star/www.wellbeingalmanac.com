@@ -7,6 +7,7 @@ import {
   BellOff,
   ExternalLink,
   GitBranch,
+  LineChart as LineChartIcon,
   MapPin,
   Network,
   Radar,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { DOMAIN_LABEL } from "@/intel/config";
 import IntelMap, { type MapFocus } from "./IntelMap";
+import { AnalystBadge, CountryAssessment, Delta, RegionalAssessment, Sparkline, TrendsTab } from "./TrendsPanel";
 import {
   SEVERITY_LABEL,
   type AgentState,
@@ -44,7 +46,7 @@ const SEV_STYLE: Record<Severity, { chip: string; bar: string; text: string }> =
 
 const FLAG: Record<CountryCode, string> = { ID: "🇮🇩", TH: "🇹🇭", LA: "🇱🇦", KH: "🇰🇭", VN: "🇻🇳" };
 
-type Tab = "feed" | "alerts" | "impacts" | "comms" | "agents";
+type Tab = "feed" | "alerts" | "impacts" | "trends" | "comms" | "agents";
 
 function ago(iso: string) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
@@ -294,7 +296,11 @@ export default function IntelDashboard() {
                       {c.agentsOk < c.agentsTotal / 2 ? "—" : c.risk}
                     </span>
                     <span className="text-xs text-slate-500 mb-1">/100 risk</span>
+                    <span className="ml-auto mb-1">
+                      <Delta trend={snap.trends.countries.find((t) => t.country === c.country)} />
+                    </span>
                   </div>
+                  <Sparkline trend={snap.trends.countries.find((t) => t.country === c.country)} />
                   <div className="h-1.5 bg-slate-800 rounded mt-1 overflow-hidden">
                     <div className={`h-full ${SEV_STYLE[c.level].bar}`} style={{ width: `${c.risk}%` }} />
                   </div>
@@ -323,6 +329,7 @@ export default function IntelDashboard() {
                       ["feed", "Intel feed", Activity, feed.length],
                       ["alerts", "Fused alerts", AlertTriangle, alerts.length],
                       ["impacts", "Knock-on effects", GitBranch, chains.length],
+                      ["trends", "Trends", LineChartIcon, snap.trends.sweeps],
                       ["comms", "Agent comms", Network, comms.length],
                       ["agents", "Agents", Users, 100],
                     ] as const
@@ -396,7 +403,7 @@ export default function IntelDashboard() {
                   <ul className="divide-y divide-slate-800/70 max-h-[76vh] overflow-y-auto">
                     {alerts.length === 0 && <Empty text="No fused alerts — agents have not corroborated any events yet." />}
                     {alerts.map((a) => (
-                      <AlertRow key={a.id} a={a} signalById={signalById} onMap={showOnMap} />
+                      <AlertRow key={a.id} a={a} signalById={signalById} onMap={showOnMap} age={snap.trends.alertAge[a.id]} sweepAt={snap.generatedAt} />
                     ))}
                   </ul>
                 )}
@@ -408,6 +415,9 @@ export default function IntelDashboard() {
                       <ChainRow
                         key={c.id}
                         c={c}
+                        ai={snap.analyst?.chains.find((x) => x.chain_id === c.id)}
+                        age={snap.trends.chainAge[c.id]}
+                        sweepAt={snap.generatedAt}
                         signalById={signalById}
                         onMap={showOnMap}
                         highlight={chainFocus === c.id}
@@ -416,6 +426,8 @@ export default function IntelDashboard() {
                     ))}
                   </ul>
                 )}
+
+                {tab === "trends" && <TrendsTab trends={snap.trends} country={country} />}
 
                 {tab === "comms" && (
                   <ul className="divide-y divide-slate-800/70 max-h-[76vh] overflow-y-auto font-mono text-xs">
@@ -432,10 +444,25 @@ export default function IntelDashboard() {
               {/* Side panel */}
               <aside className="space-y-4">
                 <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-4">
-                  <h2 className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
                     <Shield className="w-4 h-4 text-emerald-400" />
                     {selected ? `${FLAG[selected.country]} ${selected.name} brief` : "Regional brief · SEA-HQ"}
                   </h2>
+                  <div className="mb-2">
+                    <AnalystBadge analyst={snap.analyst} status={snap.analystStatus} />
+                  </div>
+                  {snap.analyst &&
+                    (selected ? (
+                      (() => {
+                        const a = snap.analyst.countries.find((x) => x.country === selected.country);
+                        return a ? <CountryAssessment a={a} /> : null;
+                      })()
+                    ) : (
+                      <div className="mb-3 pb-3 border-b border-slate-800">
+                        <RegionalAssessment analyst={snap.analyst} />
+                      </div>
+                    ))}
+                  {snap.analyst && <div className="text-[10px] font-mono text-slate-500 mb-1">RULE-BASED SUMMARY</div>}
                   <ul className="space-y-1.5 text-sm text-slate-300">
                     {(selected ? selected.brief : snap.regionalBrief).map((line, i) => (
                       <li key={i} className="leading-snug">
@@ -472,6 +499,11 @@ export default function IntelDashboard() {
                     ports, power and rice trade, migrant workers, scam networks, storm tracks and the South China Sea. That
                     model predicts the knock-on effects, the agents expecting each effect get a heads-up and go looking for
                     it, and they report back whether they see it. Country leads and SEA-HQ then cross-check everything.
+                  </p>
+                  <p>
+                    Every sweep is stored, so the agents compare against their own 24-hour baseline to spot escalation. When an
+                    Anthropic API key is set, an AI analyst writes the assessments and sends collection requests back to specific
+                    agents for the next sweep.
                   </p>
                   <p>Sources: Google/Bing News, Open-Meteo, CAMS, USGS, GDACS, US State Dept, UK FCDO, open.er-api.</p>
                   <p>Polls every 5 min; server re-sweeps at most every 10 min. Automated triage — verify before acting.</p>
@@ -568,13 +600,36 @@ function SignalRow({
   );
 }
 
-function AlertRow({ a, signalById, onMap }: { a: FusedAlert; signalById: Map<string, Signal>; onMap: (id: string) => void }) {
+/** How long an alert/chain has been running, measured at the sweep time (keeps render pure). */
+function AgeBadge({ age, at }: { age?: { firstSeen: string; isNew: boolean }; at?: string }) {
+  if (!age) return null;
+  if (age.isNew) return <span className="px-1 rounded bg-violet-900/60 text-violet-200 text-[9px] font-semibold tracking-wider">NEW</span>;
+  if (!at) return null;
+  const h = (new Date(at).getTime() - new Date(age.firstSeen).getTime()) / 3_600_000;
+  if (h < 0.5) return null;
+  return <span className="text-[10px] text-slate-500">active {h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`}</span>;
+}
+
+function AlertRow({
+  a,
+  signalById,
+  onMap,
+  age,
+  sweepAt,
+}: {
+  a: FusedAlert;
+  signalById: Map<string, Signal>;
+  onMap: (id: string) => void;
+  age?: { firstSeen: string; isNew: boolean };
+  sweepAt?: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <li className="p-3">
       <button onClick={() => setOpen((o) => !o)} className="w-full text-left">
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
           <SevChip s={a.severity} />
+          <AgeBadge age={age} at={sweepAt} />
           <span>{a.countries.map((c) => FLAG[c]).join(" ")}</span>
           <span>{a.domains.map((d) => DOMAIN_LABEL[d]).join(" + ")}</span>
           <span>· {a.signalIds.length} signals · {a.agents.length} agents</span>
@@ -627,12 +682,18 @@ const STATUS_LABEL: Record<Impact["status"], { text: string; cls: string; hint: 
 
 function ChainRow({
   c,
+  ai,
+  age,
+  sweepAt,
   signalById,
   onMap,
   highlight,
   country,
 }: {
   c: ImpactChain;
+  ai?: { interpretation: string; second_order_effects: string[]; confidence: string };
+  age?: { firstSeen: string; isNew: boolean };
+  sweepAt?: string;
   signalById: Map<string, Signal>;
   onMap: (id: string) => void;
   highlight: boolean;
@@ -650,6 +711,7 @@ function ChainRow({
     <li ref={ref} className={`p-3 ${highlight ? "bg-fuchsia-950/20" : ""}`}>
       <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
         <SevChip s={c.severity} />
+        <AgeBadge age={age} at={sweepAt} />
         <span>{FLAG[c.from]}</span>
         <span className="text-slate-300">{c.event}</span>
         <span>
@@ -698,10 +760,25 @@ function ChainRow({
           </div>
         ))}
       </div>
-      <div className="mt-2 rounded border border-slate-800 bg-slate-950/50 p-2 text-xs text-slate-300">
-        <span className="text-[10px] font-mono text-sky-300">GEOPOLITICAL READ · </span>
-        {c.interpretation}
-      </div>
+      {ai && (
+        <div className="mt-2 rounded border border-violet-900 bg-violet-950/20 p-2 text-xs text-slate-200">
+          <span className="text-[10px] font-mono text-violet-300">AI ANALYST READ · {ai.confidence} confidence · </span>
+          {ai.interpretation}
+          {ai.second_order_effects.length > 0 && (
+            <ul className="mt-1 list-disc ml-4 text-slate-400">
+              {ai.second_order_effects.map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {(!ai || open) && (
+        <div className="mt-2 rounded border border-slate-800 bg-slate-950/50 p-2 text-xs text-slate-300">
+          <span className="text-[10px] font-mono text-sky-300">{ai ? "RULE-BASED READ" : "GEOPOLITICAL READ (rule-based)"} · </span>
+          {c.interpretation}
+        </div>
+      )}
       <button onClick={() => setOpen((o) => !o)} className="mt-1.5 text-[11px] text-slate-400 hover:text-slate-200">
         {open ? "Show less" : `Show reasoning & evidence${impacts.length > 5 ? ` (+${impacts.length - 5} more effects)` : ""}`}
       </button>
@@ -710,6 +787,8 @@ function ChainRow({
 }
 
 const KIND_STYLE: Record<BusMessage["kind"], string> = {
+  trend: "text-amber-300",
+  tasking: "text-violet-300",
   "heads-up": "text-fuchsia-300",
   confirm: "text-emerald-300",
   "no-evidence": "text-slate-500",

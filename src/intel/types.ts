@@ -77,7 +77,17 @@ export interface BusMessage {
   time: string;
   from: string;
   to: string;
-  kind: "report" | "corroborate" | "escalate" | "cross-border" | "brief" | "heads-up" | "confirm" | "no-evidence";
+  kind:
+    | "report"
+    | "corroborate"
+    | "escalate"
+    | "cross-border"
+    | "brief"
+    | "heads-up"
+    | "confirm"
+    | "no-evidence"
+    | "trend"
+    | "tasking";
   text: string;
   signalIds: string[];
 }
@@ -148,6 +158,58 @@ export interface CountryPicture {
   inbound: number;
 }
 
+export interface CountryTrend {
+  country: CountryCode;
+  /** oldest → newest, including the current sweep */
+  series: { t: string; risk: number }[];
+  delta24h: number | null;
+  deltaLast: number | null;
+  /** consecutive sweeps of rising (+) or falling (−) risk */
+  streak: number;
+  escalating: { domain: Domain; now: number; baseline: number; ratio: number }[];
+}
+
+export interface Trends {
+  sweeps: number;
+  since: string | null;
+  store: { backend: string; durable: boolean; note: string };
+  countries: CountryTrend[];
+  alertAge: Record<string, { firstSeen: string; isNew: boolean }>;
+  chainAge: Record<string, { firstSeen: string; isNew: boolean }>;
+  resolved: { headline: string; sev: Severity; lastSeen: string }[];
+  escalations: string[];
+}
+
+export type ThreatLevel = "low" | "guarded" | "elevated" | "high" | "severe";
+export type Confidence = "low" | "moderate" | "high";
+
+export interface AnalystAssessment {
+  model: string;
+  generatedAt: string;
+  /** generatedAt of the sweep the assessment was written for */
+  sweepAt: string;
+  regional: {
+    summary: string;
+    key_judgements: { judgement: string; confidence: Confidence; basis: string }[];
+    watch_next_72h: string[];
+  };
+  countries: {
+    country: CountryCode;
+    situation: string;
+    outlook_72h: string;
+    threat_level: ThreatLevel;
+    student_traveller_guidance: string;
+    indicators_to_watch: string[];
+  }[];
+  chains: { chain_id: string; interpretation: string; second_order_effects: string[]; confidence: Confidence }[];
+  collection_gaps: { country: CountryCode; domain: Domain; request: string; search_query: string }[];
+}
+
+export interface AnalystStatus {
+  state: "ok" | "cached" | "disabled" | "error";
+  detail: string;
+}
+
 export interface IntelSnapshot {
   generatedAt: string;
   durationMs: number;
@@ -158,4 +220,7 @@ export interface IntelSnapshot {
   chains: ImpactChain[];
   countries: CountryPicture[];
   regionalBrief: string[];
+  trends: Trends;
+  analyst: AnalystAssessment | null;
+  analystStatus: AnalystStatus;
 }

@@ -57,5 +57,15 @@ A 100-agent open-source intelligence watch on Indonesia, Thailand, Laos, Cambodi
 - **Map** (`src/components/intel/IntelMap.tsx`): every incident is plotted — exact coordinates for sensor feeds,
   gazetteer matches (`src/intel/gazetteer.ts`) for named places and border areas, dashed markers for country-level reports;
   knock-on arcs run from each incident to where its effects land (solid = verified, dashed = projected).
-- **API**: `GET /api/intel` (cached 10 min), `GET /api/intel?refresh=1` forces a sweep.
+- **History & trends** (`src/intel/history.ts`, `src/intel/trends.ts`): every sweep is stored (Upstash Redis / Vercel KV
+  if `KV_REST_API_URL`/`KV_REST_API_TOKEN` are set, otherwise a local `.data/` file). Each country gets a risk time-series,
+  24h change, rising/falling streaks and per-discipline escalation against its own 24h baseline; alerts show NEW / how long
+  they've been active, and resolved alerts are listed. Big moves raise "Trend" alerts and task the relevant agents.
+- **AI analyst** (`src/intel/analyst.ts`): with `ANTHROPIC_API_KEY` set, Claude (`claude-opus-5-5`, structured outputs)
+  writes the regional bottom line and key judgements, per-country outlook and student/traveller guidance, an interpretation
+  of each knock-on chain, and collection gaps that become searches by specific agents on the next sweep. Runs at most every
+  `INTEL_AI_INTERVAL_MIN` minutes (default 30); falls back to the rule-based reads otherwise.
+- **API**: `GET /api/intel` (cached 10 min), `GET /api/intel?refresh=1` forces a sweep (at most every 2 min).
+  `GET /api/intel/sweep` with `Authorization: Bearer $CRON_SECRET` is for schedulers — `.github/workflows/intel-sweep.yml`
+  calls it every 15 minutes once the `INTEL_SWEEP_URL` and `CRON_SECRET` repo secrets are set. See `.env.example`.
 - The dashboard polls every 5 minutes and can raise browser notifications for new HIGH/CRITICAL fused alerts.

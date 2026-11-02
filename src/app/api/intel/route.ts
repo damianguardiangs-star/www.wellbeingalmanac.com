@@ -1,7 +1,7 @@
 import { getSnapshot } from "@/intel/engine";
 
-// A full sweep of 100 agents can take a while on a cold start.
-export const maxDuration = 120;
+// A full sweep of 100 agents plus the AI analyst can take a couple of minutes.
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
