@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { DOMAIN_LABEL } from "@/intel/config";
 import IntelMap, { type MapFocus } from "./IntelMap";
+import InstallPrompt from "./InstallPrompt";
 import { AnalystBadge, CountryAssessment, Delta, RegionalAssessment, Sparkline, TrendsTab } from "./TrendsPanel";
 import {
   SEVERITY_LABEL,
@@ -225,6 +226,7 @@ export default function IntelDashboard() {
               {snap ? `${online}/100 agents online` : "deploying…"}
             </span>
             {snap && <span className="text-slate-400 hidden sm:inline">sweep {ago(snap.generatedAt)} · {(snap.durationMs / 1000).toFixed(1)}s</span>}
+            <InstallPrompt />
             <button
               onClick={toggleNotify}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border ${notify ? "border-emerald-600 text-emerald-300 bg-emerald-950/40" : "border-slate-700 text-slate-300 hover:bg-slate-800"}`}
