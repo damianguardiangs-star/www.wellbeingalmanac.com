@@ -16,7 +16,7 @@
  */
 import { COUNTRIES, COUNTRY_BY_CODE } from "./config";
 import { COUNTRY_CENTROID, geocode } from "./gazetteer";
-import { extractTags, hash, hoursAgo, scoreHeadline } from "./analysis";
+import { extractTags, hash, hoursAgo, isAbout, scoreHeadline } from "./analysis";
 import { searchNews } from "./sources";
 import type { Agent } from "./agents";
 import type {
@@ -172,7 +172,7 @@ function classify(s: Signal): EventType[] {
   if (has("haze") || (s.domain === "air" && s.severity >= 2)) out.push("haze");
   if ((has("border") || [...t].some((x) => x.startsWith("country:"))) && ["security", "geopolitics", "unrest", "infrastructure"].includes(s.domain))
     out.push("border");
-  if (s.domain === "unrest" || has("protest", "strike")) out.push("unrest");
+  if (s.domain === "unrest" || (has("protest") && ["politics", "students", "security"].includes(s.domain))) out.push("unrest");
   if ((s.domain === "politics" && s.severity >= 3) || has("coup", "election")) out.push("political");
   if (has("south china sea") || (has("coast guard", "navy") && s.domain === "maritime")) out.push("scs");
   if (has("rice")) out.push("rice");
@@ -507,7 +507,7 @@ export async function propagate(
         try {
           const { items, provider } = await searchNews(query);
           const hits = items
-            .filter((it) => hoursAgo(it.published) <= 72)
+            .filter((it) => hoursAgo(it.published) <= 72 && isAbout(it.title, c))
             .filter((it) => {
               const t = it.title.toLowerCase();
               return rule.keywords.some((k) => t.includes(k.toLowerCase())) || t.includes(term.toLowerCase());

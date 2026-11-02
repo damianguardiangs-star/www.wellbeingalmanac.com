@@ -213,9 +213,28 @@ const GDACS_TYPES: Record<string, string> = {
   TS: "Tsunami",
 };
 
+// GDACS has changed its query parameters over time; try known forms and keep the first that works.
+const GDACS_URLS = [
+  "https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP",
+  "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ;TC;FL;VO;DR;WF",
+  "https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP?eventtypes=EQ,TC,FL,VO,DR,WF",
+];
+
+async function fetchFirstJson<T>(urls: string[]): Promise<T> {
+  const errors: string[] = [];
+  for (const u of urls) {
+    try {
+      return await fetchJson<T>(u);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  throw new Error(errors.join("; "));
+}
+
 export async function gdacsEvents(cache: SharedCache): Promise<GdacsEvent[]> {
   return cache.get("gdacs", async () => {
-    const data = await fetchJson<{
+    const data = await fetchFirstJson<{
       features: {
         properties: {
           eventid: number;
@@ -230,7 +249,7 @@ export async function gdacsEvents(cache: SharedCache): Promise<GdacsEvent[]> {
         };
         geometry?: { type: string; coordinates: unknown };
       }[];
-    }>("https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP?eventlist=EQ;TC;FL;VO;DR;WF;TS");
+    }>(GDACS_URLS);
     const seen = new Map<string, GdacsEvent>();
     for (const f of data.features ?? []) {
       const p = f.properties;

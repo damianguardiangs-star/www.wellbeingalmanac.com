@@ -21,11 +21,14 @@ export interface CountryConfig {
   maritime: string[];
   /** Country-specific geopolitical flashpoints */
   flashpoints: string[];
+  /** Adjectives / demonyms that show a headline is about this country */
+  demonyms: string[];
 }
 
 export const COUNTRIES: CountryConfig[] = [
   {
     code: "ID",
+    demonyms: ["Indonesian", "Indonesians"],
     name: "Indonesia",
     aliases: ["Indonesia"],
     currency: "IDR",
@@ -42,6 +45,7 @@ export const COUNTRIES: CountryConfig[] = [
   },
   {
     code: "TH",
+    demonyms: ["Thai", "Thais"],
     name: "Thailand",
     aliases: ["Thailand"],
     currency: "THB",
@@ -58,6 +62,7 @@ export const COUNTRIES: CountryConfig[] = [
   },
   {
     code: "LA",
+    demonyms: ["Lao", "Laotian"],
     name: "Laos",
     aliases: ["Laos", "Lao People's Democratic Republic", "Lao PDR"],
     currency: "LAK",
@@ -73,6 +78,7 @@ export const COUNTRIES: CountryConfig[] = [
   },
   {
     code: "KH",
+    demonyms: ["Cambodian", "Cambodians", "Khmer"],
     name: "Cambodia",
     aliases: ["Cambodia"],
     currency: "KHR",
@@ -88,6 +94,7 @@ export const COUNTRIES: CountryConfig[] = [
   },
   {
     code: "VN",
+    demonyms: ["Vietnamese"],
     name: "Vietnam",
     aliases: ["Vietnam", "Viet Nam"],
     currency: "VND",

@@ -5,7 +5,7 @@ import { SharedCache, fxRates, searchNews } from "./sources";
 import { getStore, type SweepRecord } from "./history";
 import { buildRecord, computeTrends, trendBriefLines } from "./trends";
 import { runAnalyst } from "./analyst";
-import { extractTags, hash, hoursAgo, scoreHeadline } from "./analysis";
+import { extractTags, hash, hoursAgo, isAbout, scoreHeadline } from "./analysis";
 import { geocode } from "./gazetteer";
 import { COUNTRY_BY_CODE } from "./config";
 import type { AgentState, AnalystAssessment, BusMessage, IntelSnapshot, Signal } from "./types";
@@ -63,7 +63,7 @@ async function runTaskings(previous: AnalystAssessment | null, states: Map<strin
     const query = gap.search_query.toLowerCase().includes(c.name.toLowerCase()) ? gap.search_query : `${c.name} ${gap.search_query}`;
     try {
       const { items, provider } = await searchNews(query);
-      const hits = items.filter((it) => hoursAgo(it.published) <= 72).slice(0, 2);
+      const hits = items.filter((it) => hoursAgo(it.published) <= 72 && isAbout(it.title, c)).slice(0, 2);
       for (const it of hits) {
         signals.push({
           id: hash(`${agent.id}|task|${it.link}`),

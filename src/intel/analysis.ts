@@ -1,4 +1,5 @@
 import { COUNTRIES, type CountryConfig } from "./config";
+import { PLACES } from "./gazetteer";
 import type { Severity } from "./types";
 
 /** Keyword → severity lexicon used to triage headlines. Highest match wins. */
@@ -106,4 +107,35 @@ export function hash(s: string): string {
     h = Math.imul(h, 16777619);
   }
   return (h >>> 0).toString(36);
+}
+
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "[\\s-]+");
+const RELEVANCE = new Map<string, [RegExp, RegExp | null]>();
+
+/**
+ * Does a headline actually concern this country? Search engines return loose matches
+ * (a French protest for a "Laos protest" query), so a story must name the country, a
+ * demonym, or one of its known places, ports or flashpoints.
+ */
+export function isAbout(text: string, c: CountryConfig): boolean {
+  let entry = RELEVANCE.get(c.code);
+  if (!entry) {
+    const terms = [
+      ...c.aliases,
+      ...c.demonyms,
+      ...c.cities.map((x) => x.name),
+      ...c.maritime,
+      ...c.flashpoints.filter((f) => !/china|united states|asean|border/i.test(f)),
+      ...PLACES.filter((p) => p.country === c.code).map((p) => p.name),
+    ];
+    const long = [...new Set(terms.filter((t) => t.length > 4))];
+    // Short names (Bali, Hue, Yala, Lao, Thai…) match case-sensitively to avoid hits on ordinary words.
+    const short = [...new Set(terms.filter((t) => t.length <= 4))];
+    entry = [
+      new RegExp(`\\b(${long.map(escapeRe).join("|")})\\b`, "i"),
+      short.length ? new RegExp(`\\b(${short.map(escapeRe).join("|")})\\b`) : null,
+    ];
+    RELEVANCE.set(c.code, entry);
+  }
+  return entry[0].test(text) || (entry[1]?.test(text) ?? false);
 }

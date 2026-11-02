@@ -1,5 +1,5 @@
 import { COUNTRIES, ROLES, type CountryConfig, type RoleConfig } from "./config";
-import { extractTags, hash, hoursAgo, scoreHeadline } from "./analysis";
+import { extractTags, hash, hoursAgo, isAbout, scoreHeadline } from "./analysis";
 import { geocode } from "./gazetteer";
 import {
   airQuality,
@@ -65,6 +65,7 @@ const newsRunner =
     const out: Signal[] = [];
     for (const it of items) {
       if (hoursAgo(it.published) > NEWS_MAX_AGE_H) continue;
+      if (!isAbout(it.title, c)) continue; // drop loose search matches about other countries
       const key = it.title.toLowerCase().slice(0, 60);
       if (seen.has(key)) continue;
       seen.add(key);

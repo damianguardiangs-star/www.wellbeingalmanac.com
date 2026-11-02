@@ -61,8 +61,15 @@ const CHAINS: { cause: Domain[]; effect: Domain[]; minCause: Severity; headline:
   },
 ];
 
-/** Tags too generic to prove two reports are about the same thing. */
-const WEAK_TAGS = new Set(["military", "students", "tourists", "flight", "port", "storm"]);
+/** Tags too generic to prove two reports are about the same thing (plus internal bookkeeping tags). */
+const WEAK_TAGS = new Set(["military", "students", "tourists", "flight", "port", "storm", "follow-up", "analyst-tasking", "strike"]);
+
+/** Only these tags are specific enough to link reports in different countries to one event. */
+/** Capitals appear in most national stories, so they prove nothing about two reports being linked. */
+const CAPITAL_TAGS = new Set(COUNTRIES.map((c) => `place:${c.cities[0].name.toLowerCase()}`));
+
+const CROSS_BORDER_TAG = (t: string) =>
+  t.startsWith("storm:") || t === "south china sea" || t === "mekong" || t === "haze" || t === "typhoon";
 
 let seq = 0;
 const msgId = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -112,7 +119,8 @@ export function fuse(signals: Signal[], agents: Agent[], chains: ImpactChain[] =
 
     // 2a — corroboration: same strong tag across ≥2 domains.
     const byTag = new Map<string, Signal[]>();
-    for (const s of local) for (const t of s.tags) if (!WEAK_TAGS.has(t) && !t.startsWith("advisory-level")) {
+    // Mentions of other countries are handled by SEA-HQ's cross-border pass, not as local corroboration.
+    for (const s of local) for (const t of s.tags) if (!WEAK_TAGS.has(t) && !t.startsWith("advisory-level") && !t.startsWith("country:") && !CAPITAL_TAGS.has(t)) {
       (byTag.get(t) ?? byTag.set(t, []).get(t)!).push(s);
     }
     const usedSets = new Set<string>();
@@ -201,7 +209,7 @@ export function fuse(signals: Signal[], agents: Agent[], chains: ImpactChain[] =
   for (const s of signals) {
     if (s.severity < 2) continue;
     for (const t of s.tags) {
-      if (WEAK_TAGS.has(t) || t.startsWith("place:") || t.startsWith("advisory-level")) continue;
+      if (!t.startsWith("country:") && !CROSS_BORDER_TAG(t)) continue;
       // A Thai agent reporting on Cambodia and a Cambodian agent reporting on Thailand
       // describe the same bilateral situation, so both land in one "pair:" bucket.
       const key = t.startsWith("country:") ? `pair:${[s.country, t.slice(8)].sort().join("-")}` : t;
@@ -297,20 +305,22 @@ export function fuse(signals: Signal[], agents: Agent[], chains: ImpactChain[] =
   const countries: CountryPicture[] = COUNTRIES.map((c) => {
     const local = signals.filter((s) => s.country === c.code);
     const domainScore = new Map<Domain, number>();
-    let total = 0;
     for (const s of local) {
       const decay = Math.max(0.25, 1 - Math.max(0, hoursAgo(s.time)) / 96);
       const pts = SEVERITY_POINTS[s.severity] * DOMAIN_WEIGHT[s.domain] * decay;
-      total += pts;
       domainScore.set(s.domain, (domainScore.get(s.domain) ?? 0) + pts);
     }
+    // Diminishing returns per discipline: ten stories about one thing shouldn't max out a
+    // country — breadth across disciplines matters more than volume in one.
+    let total = 0;
+    for (const v of domainScore.values()) total += 30 * (1 - Math.exp(-v / 30));
     // Exposure to knock-on effects from incidents elsewhere also raises a country's risk.
     const inboundImpacts = chains.flatMap((ch) => ch.impacts).filter((im) => im.to === c.code && im.from !== c.code);
     for (const im of inboundImpacts) {
       if (im.status === "no-evidence") continue;
       total += SEVERITY_POINTS[im.severity] * DOMAIN_WEIGHT[im.domain] * im.confidence * (im.status === "projected" ? 0.4 : 0.8);
     }
-    const risk = Math.round(100 * (1 - Math.exp(-total / 90)));
+    const risk = Math.round(100 * (1 - Math.exp(-total / 220)));
     const level: Severity = risk >= 80 ? 4 : risk >= 60 ? 3 : risk >= 35 ? 2 : risk >= 10 ? 1 : 0;
     const advisory = local.find((s) => s.domain === "advisory" && s.source === "US State Dept");
     const advisoryLevel = advisory ? Number(advisory.tags.find((t) => t.startsWith("advisory-level:"))?.split(":")[1]) || undefined : undefined;
