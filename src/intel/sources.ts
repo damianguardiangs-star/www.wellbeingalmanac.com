@@ -5,7 +5,7 @@
  * result is shared between them — the agents' common memory.
  */
 
-const UA = "WellbeingAlmanac-IntelSwarm/1.0 (+https://www.wellbeingalmanac.com)";
+const UA = "247GapIntel/1.0";
 const TIMEOUT_MS = 12_000;
 
 export class SharedCache {

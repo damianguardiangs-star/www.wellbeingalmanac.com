@@ -1,4 +1,4 @@
-# Keeps the SEA Intel Swarm sweeping every 15 minutes, 24/7, so history and trends
+# Keeps 24/7 Gap Intel sweeping every 15 minutes, 24/7, so history and trends
 # build up even when nobody has the dashboard open. Free on GitHub Actions.
 # Setup: add repository secrets INTEL_SWEEP_URL (https://<your-domain>/api/intel/sweep)
 # and CRON_SECRET (same value as the CRON_SECRET env var on your deployment).

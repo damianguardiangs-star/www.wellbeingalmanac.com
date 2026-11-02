@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TikTok Sourcing Hub — Find & Profit from Trending Products",
-  description: "Discover trending TikTok products, find wholesale sources, calculate landed cost, markup, and P&L in one dashboard.",
+  title: "24/7 Gap Intel",
+  description: "24/7 open-source intelligence on Indonesia, Thailand, Laos, Cambodia and Vietnam.",
 };
 
 export default function RootLayout({

@@ -21,7 +21,7 @@ interface EngineMemory {
 }
 
 // Survives hot reloads in dev and is reused across requests on a warm server.
-const mem: EngineMemory = ((globalThis as { __intelSwarm?: EngineMemory }).__intelSwarm ??= {});
+const mem: EngineMemory = ((globalThis as { __gapIntel?: EngineMemory }).__gapIntel ??= {});
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {

@@ -113,7 +113,7 @@ export default function IntelDashboard() {
     setTimeout(() => setToasts((t) => t.filter((x) => !ids.has(x.id))), 15_000);
     if (notifyRef.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
       for (const a of fresh.slice(0, 3)) {
-        new Notification(`[${SEVERITY_LABEL[a.severity]}] SEA Intel`, { body: a.headline, tag: a.id });
+        new Notification(`[${SEVERITY_LABEL[a.severity]}] 24/7 Gap Intel`, { body: a.headline, tag: a.id });
       }
     }
   }, []);
@@ -213,7 +213,7 @@ export default function IntelDashboard() {
               <Radar className={`w-5 h-5 text-emerald-400 ${loading ? "animate-spin" : ""}`} />
             </div>
             <div>
-              <h1 className="font-bold tracking-wide text-white leading-none">SEA INTEL SWARM</h1>
+              <h1 className="font-bold tracking-wide text-white leading-none">24/7 GAP INTEL</h1>
               <p className="text-[11px] text-slate-400 font-mono mt-1">
                 100 agents · ID · TH · LA · KH · VN · open-source intelligence
               </p>
