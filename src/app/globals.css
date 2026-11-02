@@ -24,3 +24,20 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ── Intel map ── */
+.intel-map .leaflet-container { background: #0b1220; font-family: inherit; }
+.intel-map .leaflet-popup-content-wrapper,
+.intel-map .leaflet-popup-tip { background: #0f172a; color: #e2e8f0; border: 1px solid #334155; }
+.intel-map .leaflet-popup-content { margin: 10px 12px; font-size: 12px; line-height: 1.4; }
+.intel-map .intel-pop .t { color: #f8fafc; font-size: 13px; }
+.intel-map .intel-pop .m { color: #94a3b8; font-size: 11px; }
+.intel-map .intel-pop a { color: #f8fafc; text-decoration: underline; }
+.intel-map .leaflet-tooltip { background: #0f172a; color: #e2e8f0; border: 1px solid #334155; }
+.intel-map .leaflet-control-attribution { background: rgba(7, 11, 18, 0.8); color: #64748b; }
+.intel-map .leaflet-control-attribution a { color: #94a3b8; }
+.intel-pulse { animation: intel-pulse 1.8s ease-in-out infinite; }
+@keyframes intel-pulse {
+  0%, 100% { stroke-opacity: 1; stroke-width: 2.5; }
+  50% { stroke-opacity: 0.25; stroke-width: 6; }
+}
