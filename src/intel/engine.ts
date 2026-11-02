@@ -1,5 +1,6 @@
 import { AGENTS, type AgentContext } from "./agents";
 import { fuse } from "./fusion";
+import { propagate } from "./impact";
 import { SharedCache, fxRates } from "./sources";
 import type { AgentState, IntelSnapshot, Signal } from "./types";
 
@@ -91,11 +92,26 @@ async function sweep(): Promise<IntelSnapshot> {
     const prev = deduped.get(key);
     if (!prev || s.severity > prev.severity) deduped.set(key, s);
   }
+  // Agents coordinate on consequences: project knock-on effects, check the shared
+  // blackboard, and task target agents with follow-up collection.
+  const blackboard = [...deduped.values()];
+  const impact = await propagate(blackboard, AGENTS, { followUps: true });
+  for (const s of impact.followUpSignals) {
+    const key = `${s.country}|${s.url || s.title}`;
+    if (!deduped.has(key)) deduped.set(key, s);
+    const st = states.get(s.agentId);
+    if (st) {
+      st.signalCount++;
+      if (st.status === "empty") st.status = "ok";
+    }
+  }
   const finalSignals = [...deduped.values()].sort(
     (a, b) => b.severity - a.severity || new Date(b.time).getTime() - new Date(a.time).getTime(),
   );
 
-  const { alerts, messages, countries, regionalBrief } = fuse(finalSignals, AGENTS);
+  const fused = fuse(finalSignals, AGENTS, impact.chains);
+  const { alerts, countries, regionalBrief } = fused;
+  const messages = [...fused.messages, ...impact.messages];
   const agents = AGENTS.map((a) => states.get(a.id)!);
   for (const c of countries) {
     const collectors = agents.filter((a) => a.country === c.country && a.domain !== "fusion");
@@ -121,6 +137,7 @@ async function sweep(): Promise<IntelSnapshot> {
     signals: finalSignals,
     alerts,
     messages,
+    chains: impact.chains,
     countries,
     regionalBrief,
   };

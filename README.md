@@ -47,7 +47,15 @@ A 100-agent open-source intelligence watch on Indonesia, Thailand, Laos, Cambodi
 - **Agent bus / fusion** (`src/intel/fusion.ts`): collectors report to their country lead; leads corroborate the
   same event across disciplines, check cause→effect chains (hazard→shipping, unrest→students, geopolitics→markets)
   and task other agents; SEA-HQ raises cross-border alerts.
+- **Knock-on effects** (`src/intel/impact.ts`): every significant incident is classed (storm, border confrontation,
+  scam compounds, Mekong/dam, rice shock, unrest…) and pushed through a regional dependency model — borders, Mekong
+  downstream flow, landlocked Laos' port dependence, Lao power exports, rice trade, migrant labour, scam trafficking
+  routes, typhoon tracks, South China Sea — to predict effects on specific agents in the same country and abroad.
+  Target agents get a heads-up, check the shared blackboard, and the most important unverified cross-border effects
+  trigger targeted follow-up collection. Each effect is OBSERVED / CONFIRMED / PROJECTED / NOT SEEN, and every chain
+  carries a geopolitical read. Inbound exposure feeds each country's risk score.
 - **Map** (`src/components/intel/IntelMap.tsx`): every incident is plotted — exact coordinates for sensor feeds,
-  gazetteer matches (`src/intel/gazetteer.ts`) for named places and border areas, dashed markers for country-level reports.
+  gazetteer matches (`src/intel/gazetteer.ts`) for named places and border areas, dashed markers for country-level reports;
+  knock-on arcs run from each incident to where its effects land (solid = verified, dashed = projected).
 - **API**: `GET /api/intel` (cached 10 min), `GET /api/intel?refresh=1` forces a sweep.
 - The dashboard polls every 5 minutes and can raise browser notifications for new HIGH/CRITICAL fused alerts.

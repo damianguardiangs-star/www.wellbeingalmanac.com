@@ -19,6 +19,7 @@ import {
   type CountryPicture,
   type Domain,
   type FusedAlert,
+  type ImpactChain,
   type Severity,
   type Signal,
 } from "./types";
@@ -80,7 +81,7 @@ function bump(s: Severity, by = 1): Severity {
   return Math.min(4, s + by) as Severity;
 }
 
-export function fuse(signals: Signal[], agents: Agent[]) {
+export function fuse(signals: Signal[], agents: Agent[], chains: ImpactChain[] = []) {
   const now = new Date().toISOString();
   const messages: BusMessage[] = [];
   const alerts: FusedAlert[] = [];
@@ -252,6 +253,41 @@ export function fuse(signals: Signal[], agents: Agent[]) {
     }
   }
 
+  // 3b ─ Knock-on alerts: cross-border effects that target agents have observed or confirmed.
+  const knockSeen = new Set<string>();
+  for (const ch of chains) {
+    for (const im of ch.impacts) {
+      if (im.from === im.to || im.severity < 2 || (im.status !== "observed" && im.status !== "confirmed")) continue;
+      // A→B and B→A of the same effect (e.g. haze drifting both ways) is one regional story.
+      const pairKey = `${ch.event}|${im.domain}|${[im.from, im.to].sort().join("-")}`;
+      if (knockSeen.has(pairKey)) continue;
+      knockSeen.add(pairKey);
+      alerts.push({
+        id: hash(`knock|${im.id}`),
+        countries: [im.from, im.to],
+        domains: [...new Set([signals.find((s) => s.id === ch.trigger)?.domain ?? "fusion", im.domain])] as Domain[],
+        severity: im.severity,
+        headline: `Knock-on: ${ch.event.toLowerCase()} in ${COUNTRY_BY_CODE[im.from].name} → ${im.effect}`,
+        rationale: `${im.mechanism}. ${im.targetAgent} ${im.status === "confirmed" ? "confirmed it by follow-up collection" : "was already reporting it"}. Trigger: ${ch.headline}`,
+        signalIds: [ch.trigger, ...im.evidence],
+        agents: [im.sourceAgent, im.targetAgent],
+        time: now,
+        lat: im.toLat,
+        lon: im.toLon,
+        geo: "country",
+      });
+      messages.push({
+        id: msgId(),
+        time: now,
+        from: "SEA-HQ",
+        to: leadOf(im.to).callsign,
+        kind: "escalate",
+        text: `Confirmed spill-over from ${COUNTRY_BY_CODE[im.from].name}: ${im.effect}`,
+        signalIds: im.evidence,
+      });
+    }
+  }
+
   // De-duplicate alerts and rank.
   const unique = [...new Map(alerts.map((a) => [a.id, a])).values()].sort(
     (a, b) => b.severity - a.severity || b.signalIds.length - a.signalIds.length,
@@ -268,6 +304,12 @@ export function fuse(signals: Signal[], agents: Agent[]) {
       total += pts;
       domainScore.set(s.domain, (domainScore.get(s.domain) ?? 0) + pts);
     }
+    // Exposure to knock-on effects from incidents elsewhere also raises a country's risk.
+    const inboundImpacts = chains.flatMap((ch) => ch.impacts).filter((im) => im.to === c.code && im.from !== c.code);
+    for (const im of inboundImpacts) {
+      if (im.status === "no-evidence") continue;
+      total += SEVERITY_POINTS[im.severity] * DOMAIN_WEIGHT[im.domain] * im.confidence * (im.status === "projected" ? 0.4 : 0.8);
+    }
     const risk = Math.round(100 * (1 - Math.exp(-total / 90)));
     const level: Severity = risk >= 80 ? 4 : risk >= 60 ? 3 : risk >= 35 ? 2 : risk >= 10 ? 1 : 0;
     const advisory = local.find((s) => s.domain === "advisory" && s.source === "US State Dept");
@@ -283,6 +325,9 @@ export function fuse(signals: Signal[], agents: Agent[]) {
     );
     if (topDomains.length) brief.push(`Main drivers: ${topDomains.map((d) => DOMAIN_LABEL[d.domain]).join(", ")}.`);
     for (const a of countryAlerts.slice(0, 3)) brief.push(`[${SEVERITY_LABEL[a.severity]}] ${a.headline}`);
+    for (const im of inboundImpacts.filter((x) => x.status !== "no-evidence").sort((a, b) => b.confidence - a.confidence).slice(0, 2)) {
+      brief.push(`Inbound from ${COUNTRY_BY_CODE[im.from].name} (${im.status}, ${Math.round(im.confidence * 100)}%): ${im.effect}`);
+    }
     const weather = local.find((s) => s.domain === "weather" && s.severity === 0);
     if (weather) brief.push(weather.title);
     const lead = leadOf(c.code);
@@ -306,6 +351,7 @@ export function fuse(signals: Signal[], agents: Agent[]) {
       advisoryLevel,
       agentsOk: 0, // filled in by the engine (needs run status)
       agentsTotal: agentsHere.length + 1,
+      inbound: inboundImpacts.filter((x) => x.status !== "no-evidence").length,
     };
   });
 
@@ -315,6 +361,14 @@ export function fuse(signals: Signal[], agents: Agent[]) {
     `${unique.filter((a) => a.severity >= 3).length} high/critical fused alerts; ${unique.filter((a) => a.countries.length > 1).length} cross-border.`,
     ...unique.slice(0, 5).map((a) => `[${SEVERITY_LABEL[a.severity]}] ${a.headline}`),
   ];
+  const cross = chains.flatMap((ch) => ch.impacts).filter((im) => im.from !== im.to && im.status !== "no-evidence");
+  if (cross.length) {
+    regionalBrief.push(
+      `${cross.length} cross-border knock-on effects tracked (${cross.filter((x) => x.status !== "projected").length} observed/confirmed). Most exposed: ${
+        [...countries].sort((a, b) => b.inbound - a.inbound)[0].name
+      }.`,
+    );
+  }
 
   return { alerts: unique, messages, countries, regionalBrief };
 }

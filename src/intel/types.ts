@@ -77,7 +77,7 @@ export interface BusMessage {
   time: string;
   from: string;
   to: string;
-  kind: "report" | "corroborate" | "escalate" | "cross-border" | "brief";
+  kind: "report" | "corroborate" | "escalate" | "cross-border" | "brief" | "heads-up" | "confirm" | "no-evidence";
   text: string;
   signalIds: string[];
 }
@@ -97,6 +97,43 @@ export interface FusedAlert {
   geo: "exact" | "place" | "country";
 }
 
+export type ImpactStatus = "observed" | "confirmed" | "projected" | "no-evidence";
+export type Horizon = "hours" | "days" | "weeks";
+
+/** A projected knock-on effect of one incident on another agent's patch. */
+export interface Impact {
+  id: string;
+  from: CountryCode;
+  to: CountryCode;
+  sourceAgent: string; // callsign
+  targetAgent: string; // callsign
+  domain: Domain;
+  effect: string;
+  mechanism: string;
+  horizon: Horizon;
+  confidence: number; // 0–1
+  severity: Severity;
+  status: ImpactStatus;
+  evidence: string[]; // signal ids
+  toLat: number;
+  toLon: number;
+}
+
+/** One triggering incident and everything the swarm thinks it will cause. */
+export interface ImpactChain {
+  id: string;
+  event: string; // event class label
+  from: CountryCode;
+  trigger: string; // signal id
+  supporting: string[]; // other signal ids of the same event
+  headline: string;
+  severity: Severity;
+  lat: number;
+  lon: number;
+  interpretation: string;
+  impacts: Impact[];
+}
+
 export interface CountryPicture {
   country: CountryCode;
   name: string;
@@ -107,6 +144,8 @@ export interface CountryPicture {
   advisoryLevel?: number;
   agentsOk: number;
   agentsTotal: number;
+  /** Knock-on effects projected into this country from incidents elsewhere. */
+  inbound: number;
 }
 
 export interface IntelSnapshot {
@@ -116,6 +155,7 @@ export interface IntelSnapshot {
   signals: Signal[];
   alerts: FusedAlert[];
   messages: BusMessage[];
+  chains: ImpactChain[];
   countries: CountryPicture[];
   regionalBrief: string[];
 }

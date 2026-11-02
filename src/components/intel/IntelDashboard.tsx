@@ -6,6 +6,7 @@ import {
   Bell,
   BellOff,
   ExternalLink,
+  GitBranch,
   MapPin,
   Network,
   Radar,
@@ -23,6 +24,8 @@ import {
   type CountryCode,
   type Domain,
   type FusedAlert,
+  type Impact,
+  type ImpactChain,
   type IntelSnapshot,
   type Severity,
   type Signal,
@@ -41,7 +44,7 @@ const SEV_STYLE: Record<Severity, { chip: string; bar: string; text: string }> =
 
 const FLAG: Record<CountryCode, string> = { ID: "🇮🇩", TH: "🇹🇭", LA: "🇱🇦", KH: "🇰🇭", VN: "🇻🇳" };
 
-type Tab = "feed" | "alerts" | "comms" | "agents";
+type Tab = "feed" | "alerts" | "impacts" | "comms" | "agents";
 
 function ago(iso: string) {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
@@ -171,6 +174,24 @@ export default function IntelDashboard() {
     () => snap?.alerts.filter((a) => country === "ALL" || a.countries.includes(country)) ?? [],
     [snap, country],
   );
+  const chains = useMemo(
+    () =>
+      snap?.chains.filter((c) => country === "ALL" || c.from === country || c.impacts.some((i) => i.to === country)) ?? [],
+    [snap, country],
+  );
+  const [chainFocus, setChainFocus] = useState<string | null>(null);
+  const triggerChains = useMemo(() => {
+    const m = new Map<string, ImpactChain>();
+    for (const c of snap?.chains ?? []) {
+      m.set(c.trigger, c);
+      c.supporting.forEach((id) => m.has(id) || m.set(id, c));
+    }
+    return m;
+  }, [snap]);
+  const openChain = useCallback((id: string) => {
+    setChainFocus(id);
+    setTab("impacts");
+  }, []);
   const comms = useMemo(
     () =>
       snap?.messages.filter((m) => country === "ALL" || m.from.startsWith(country) || m.to.startsWith(country)) ?? [],
@@ -282,6 +303,7 @@ export default function IntelDashboard() {
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono">
                     {c.agentsOk}/{c.agentsTotal} agents{c.advisoryLevel ? ` · US L${c.advisoryLevel}` : ""}
+                    {c.inbound ? <span className="text-fuchsia-300"> · ⇠{c.inbound} inbound</span> : null}
                   </div>
                 </button>
               ))}
@@ -289,7 +311,7 @@ export default function IntelDashboard() {
 
             {/* Incident map — follows the feed filters and the selected country */}
             <section ref={mapRef} className="scroll-mt-20">
-              <IntelMap signals={feed} alerts={alerts} country={country} focus={focus} />
+              <IntelMap signals={feed} alerts={alerts} chains={chains} country={country} focus={focus} />
             </section>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -300,6 +322,7 @@ export default function IntelDashboard() {
                     [
                       ["feed", "Intel feed", Activity, feed.length],
                       ["alerts", "Fused alerts", AlertTriangle, alerts.length],
+                      ["impacts", "Knock-on effects", GitBranch, chains.length],
                       ["comms", "Agent comms", Network, comms.length],
                       ["agents", "Agents", Users, 100],
                     ] as const
@@ -356,7 +379,14 @@ export default function IntelDashboard() {
                     <ul className="divide-y divide-slate-800/70 max-h-[70vh] overflow-y-auto">
                       {feed.length === 0 && <Empty text="No signals match these filters." />}
                       {feed.map((s) => (
-                        <SignalRow key={s.id} s={s} agent={snap.agents.find((a) => a.id === s.agentId)} onMap={showOnMap} />
+                        <SignalRow
+                          key={s.id}
+                          s={s}
+                          agent={snap.agents.find((a) => a.id === s.agentId)}
+                          onMap={showOnMap}
+                          chain={triggerChains.get(s.id)}
+                          onChain={openChain}
+                        />
                       ))}
                     </ul>
                   </div>
@@ -367,6 +397,22 @@ export default function IntelDashboard() {
                     {alerts.length === 0 && <Empty text="No fused alerts — agents have not corroborated any events yet." />}
                     {alerts.map((a) => (
                       <AlertRow key={a.id} a={a} signalById={signalById} onMap={showOnMap} />
+                    ))}
+                  </ul>
+                )}
+
+                {tab === "impacts" && (
+                  <ul className="divide-y divide-slate-800/70 max-h-[76vh] overflow-y-auto">
+                    {chains.length === 0 && <Empty text="No knock-on chains — nothing significant enough to propagate yet." />}
+                    {chains.map((c) => (
+                      <ChainRow
+                        key={c.id}
+                        c={c}
+                        signalById={signalById}
+                        onMap={showOnMap}
+                        highlight={chainFocus === c.id}
+                        country={country}
+                      />
                     ))}
                   </ul>
                 )}
@@ -421,9 +467,11 @@ export default function IntelDashboard() {
                 </div>
                 <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-4 text-xs text-slate-400 space-y-1">
                   <p>
-                    <b className="text-slate-300">How it works:</b> 19 specialist collectors per country send reports to
-                    a country fusion lead (agent 20). Leads cross-check those reports and task each other&apos;s agents, then
-                    brief SEA-HQ, which looks for patterns across borders.
+                    <b className="text-slate-300">How it works:</b> all 100 agents share one board of findings. Every
+                    significant incident is checked against a model of how the region is connected: borders, the Mekong,
+                    ports, power and rice trade, migrant workers, scam networks, storm tracks and the South China Sea. That
+                    model predicts the knock-on effects, the agents expecting each effect get a heads-up and go looking for
+                    it, and they report back whether they see it. Country leads and SEA-HQ then cross-check everything.
                   </p>
                   <p>Sources: Google/Bing News, Open-Meteo, CAMS, USGS, GDACS, US State Dept, UK FCDO, open.er-api.</p>
                   <p>Polls every 5 min; server re-sweeps at most every 10 min. Automated triage — verify before acting.</p>
@@ -456,7 +504,19 @@ function Empty({ text }: { text: string }) {
   return <li className="p-8 text-center text-sm text-slate-500">{text}</li>;
 }
 
-function SignalRow({ s, agent, onMap }: { s: Signal; agent?: AgentState; onMap: (id: string) => void }) {
+function SignalRow({
+  s,
+  agent,
+  onMap,
+  chain,
+  onChain,
+}: {
+  s: Signal;
+  agent?: AgentState;
+  onMap: (id: string) => void;
+  chain?: ImpactChain;
+  onChain: (id: string) => void;
+}) {
   return (
     <li className="p-3 hover:bg-slate-900/60 flex gap-3">
       <div className={`w-1 rounded ${SEV_STYLE[s.severity].bar} shrink-0`} />
@@ -486,6 +546,15 @@ function SignalRow({ s, agent, onMap }: { s: Signal; agent?: AgentState; onMap: 
           )}
         </p>
         {s.summary && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{s.summary}</p>}
+        {chain && (
+          <button
+            onClick={() => onChain(chain.id)}
+            className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-fuchsia-300 hover:text-fuchsia-200"
+          >
+            <GitBranch className="w-3 h-3" />
+            {chain.impacts.length} knock-on effects ({chain.impacts.filter((i) => i.to !== chain.from).length} cross-border) →
+          </button>
+        )}
         <div className="flex flex-wrap gap-1 mt-1.5">
           <span className="text-[10px] text-slate-500">{s.source}</span>
           {s.tags.slice(0, 5).map((t) => (
@@ -549,7 +618,101 @@ function AlertRow({ a, signalById, onMap }: { a: FusedAlert; signalById: Map<str
   );
 }
 
+const STATUS_LABEL: Record<Impact["status"], { text: string; cls: string; hint: string }> = {
+  observed: { text: "OBSERVED", cls: "border-emerald-700 text-emerald-300 bg-emerald-950/40", hint: "Target agent was already reporting it" },
+  confirmed: { text: "CONFIRMED", cls: "border-emerald-600 text-emerald-200 bg-emerald-900/40", hint: "Target agent confirmed by follow-up collection" },
+  projected: { text: "PROJECTED", cls: "border-fuchsia-800 text-fuchsia-300 bg-fuchsia-950/30", hint: "Expected from the dependency model; no evidence yet" },
+  "no-evidence": { text: "NOT SEEN", cls: "border-slate-700 text-slate-400", hint: "Target agent searched and found nothing yet" },
+};
+
+function ChainRow({
+  c,
+  signalById,
+  onMap,
+  highlight,
+  country,
+}: {
+  c: ImpactChain;
+  signalById: Map<string, Signal>;
+  onMap: (id: string) => void;
+  highlight: boolean;
+  country: CountryCode | "ALL";
+}) {
+  const ref = useRef<HTMLLIElement>(null);
+  const [open, setOpen] = useState(highlight);
+  useEffect(() => {
+    if (highlight) ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [highlight]);
+  const impacts = c.impacts.filter((i) => country === "ALL" || i.to === country || c.from === country);
+  const cross = impacts.filter((i) => i.to !== c.from);
+  const local = impacts.filter((i) => i.to === c.from);
+  return (
+    <li ref={ref} className={`p-3 ${highlight ? "bg-fuchsia-950/20" : ""}`}>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
+        <SevChip s={c.severity} />
+        <span>{FLAG[c.from]}</span>
+        <span className="text-slate-300">{c.event}</span>
+        <span>
+          · {local.length} in-country · {cross.length} cross-border ·{" "}
+          {impacts.filter((i) => i.status === "observed" || i.status === "confirmed").length} verified
+        </span>
+        <button onClick={() => onMap(c.trigger)} className="ml-auto flex items-center gap-1 hover:text-emerald-300">
+          <MapPin className="w-3 h-3" /> map
+        </button>
+      </div>
+      <p className="text-sm font-semibold text-white mt-1">{c.headline}</p>
+      <div className="mt-2 grid gap-1.5">
+        {[...cross, ...local].slice(0, open ? 50 : 5).map((i) => (
+          <div key={i.id} className="flex gap-2 items-start text-xs">
+            <span
+              title={STATUS_LABEL[i.status].hint}
+              className={`shrink-0 px-1.5 py-0.5 rounded border text-[9px] font-semibold tracking-wider ${STATUS_LABEL[i.status].cls}`}
+            >
+              {STATUS_LABEL[i.status].text}
+            </span>
+            <div className="min-w-0">
+              <span className="font-mono text-slate-400">
+                {FLAG[c.from]}→{FLAG[i.to]} {i.targetAgent} · {DOMAIN_LABEL[i.domain]} · {i.horizon} · {Math.round(i.confidence * 100)}%
+              </span>
+              <div className="text-slate-200">{i.effect}</div>
+              {open && (
+                <div className="text-slate-500">
+                  Why: {i.mechanism}.
+                  {i.evidence.slice(0, 2).map((id) => {
+                    const ev = signalById.get(id);
+                    return ev ? (
+                      <div key={id} className="text-emerald-300/80">
+                        ↳ {ev.url ? (
+                          <a href={ev.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                            {ev.title}
+                          </a>
+                        ) : (
+                          ev.title
+                        )}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 rounded border border-slate-800 bg-slate-950/50 p-2 text-xs text-slate-300">
+        <span className="text-[10px] font-mono text-sky-300">GEOPOLITICAL READ · </span>
+        {c.interpretation}
+      </div>
+      <button onClick={() => setOpen((o) => !o)} className="mt-1.5 text-[11px] text-slate-400 hover:text-slate-200">
+        {open ? "Show less" : `Show reasoning & evidence${impacts.length > 5 ? ` (+${impacts.length - 5} more effects)` : ""}`}
+      </button>
+    </li>
+  );
+}
+
 const KIND_STYLE: Record<BusMessage["kind"], string> = {
+  "heads-up": "text-fuchsia-300",
+  confirm: "text-emerald-300",
+  "no-evidence": "text-slate-500",
   report: "text-slate-400",
   corroborate: "text-emerald-300",
   escalate: "text-orange-300",

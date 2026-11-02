@@ -85,7 +85,7 @@ export function extractTags(text: string, home: CountryConfig): string[] {
       tags.add(`country:${other.code}`);
     }
   }
-  const storm = text.match(/\b(?:typhoon|tropical storm|storm|cyclone)\s+([A-Z][a-z]+)/);
+  const storm = text.match(/\b(?:[Tt]yphoon|[Tt]ropical [Ss]torm|[Ss]torm|[Cc]yclone|TYPHOON|STORM)\s+([A-Z][a-z]+)/);
   if (storm && !/^(warning|season|surge|hits|batters|kills)$/i.test(storm[1])) tags.add(`storm:${storm[1].toLowerCase()}`);
   if (/south china sea|spratly|paracel|natuna/i.test(text)) tags.add("south china sea");
   if (/mekong/i.test(text)) tags.add("mekong");

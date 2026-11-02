@@ -3,7 +3,14 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { COUNTRY_BY_CODE, DOMAIN_LABEL } from "@/intel/config";
-import { SEVERITY_LABEL, type CountryCode, type FusedAlert, type Severity, type Signal } from "@/intel/types";
+import {
+  SEVERITY_LABEL,
+  type CountryCode,
+  type FusedAlert,
+  type ImpactChain,
+  type Severity,
+  type Signal,
+} from "@/intel/types";
 
 export const SEV_HEX: Record<Severity, string> = {
   0: "#64748b",
@@ -26,6 +33,7 @@ export interface MapFocus {
 interface Props {
   signals: Signal[];
   alerts: FusedAlert[];
+  chains: ImpactChain[];
   country: CountryCode | "ALL";
   focus: MapFocus | null;
 }
@@ -43,14 +51,26 @@ function jitter(id: string, spread: number): [number, number] {
   return [Math.sin(angle) * r, Math.cos(angle) * r];
 }
 
-export default function IntelMap({ signals, alerts, country, focus }: Props) {
+/** A gentle great-arc-like curve between two points so arrows don't overlap straight lines. */
+function curve(a: [number, number], b: [number, number], bend = 0.2, n = 24): [number, number][] {
+  const [y1, x1] = a;
+  const [y2, x2] = b;
+  const mx = (x1 + x2) / 2 - (y2 - y1) * bend;
+  const my = (y1 + y2) / 2 + (x2 - x1) * bend;
+  return Array.from({ length: n + 1 }, (_, i) => {
+    const t = i / n;
+    return [(1 - t) ** 2 * y1 + 2 * (1 - t) * t * my + t * t * y2, (1 - t) ** 2 * x1 + 2 * (1 - t) * t * mx + t * t * x2];
+  });
+}
+
+export default function IntelMap({ signals, alerts, chains, country, focus }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const L = useRef<typeof Leaflet | null>(null);
   const map = useRef<Leaflet.Map | null>(null);
-  const layers = useRef<{ signals: Leaflet.LayerGroup; alerts: Leaflet.LayerGroup } | null>(null);
+  const layers = useRef<{ signals: Leaflet.LayerGroup; alerts: Leaflet.LayerGroup; arcs: Leaflet.LayerGroup } | null>(null);
   const markers = useRef(new Map<string, Leaflet.CircleMarker>());
   const [ready, setReady] = useState(false);
-  const [show, setShow] = useState({ incidents: true, alerts: true, approx: true });
+  const [show, setShow] = useState({ incidents: true, alerts: true, arcs: true, approx: true });
 
   // Create the map once (Leaflet needs `window`, so it is imported on the client only).
   useEffect(() => {
@@ -67,7 +87,7 @@ export default function IntelMap({ signals, alerts, country, focus }: Props) {
         maxZoom: 18,
       }).addTo(m);
       m.fitBounds(REGION_BOUNDS);
-      layers.current = { signals: lf.layerGroup().addTo(m), alerts: lf.layerGroup().addTo(m) };
+      layers.current = { arcs: lf.layerGroup().addTo(m), signals: lf.layerGroup().addTo(m), alerts: lf.layerGroup().addTo(m) };
       map.current = m;
       setReady(true);
     });
@@ -82,9 +102,10 @@ export default function IntelMap({ signals, alerts, country, focus }: Props) {
   useEffect(() => {
     const lf = L.current;
     if (!ready || !lf || !layers.current) return;
-    const { signals: sl, alerts: al } = layers.current;
+    const { signals: sl, alerts: al, arcs } = layers.current;
     sl.clearLayers();
     al.clearLayers();
+    arcs.clearLayers();
     markers.current.clear();
 
     if (show.incidents) {
@@ -116,6 +137,40 @@ export default function IntelMap({ signals, alerts, country, focus }: Props) {
       }
     }
 
+    if (show.arcs) {
+      // Knock-on arcs: from the triggering incident to where the effect lands.
+      for (const c of chains) {
+        for (const i of c.impacts) {
+          if (i.status === "no-evidence") continue;
+          if (Math.abs(i.toLat - c.lat) + Math.abs(i.toLon - c.lon) < 0.3) continue; // same spot — nothing to draw
+          const verified = i.status === "observed" || i.status === "confirmed";
+          const colour = SEV_HEX[i.severity];
+          const line = lf.polyline(curve([c.lat, c.lon], [i.toLat, i.toLon]), {
+            color: colour,
+            weight: verified ? 2.5 : 1.5,
+            opacity: verified ? 0.9 : 0.55,
+            dashArray: verified ? undefined : "6 6",
+            className: verified ? "intel-flow" : undefined,
+          });
+          line.bindPopup(
+            `<div class="intel-pop"><b style="color:${colour}">KNOCK-ON · ${i.status.toUpperCase()}</b> · ${Math.round(i.confidence * 100)}% · ${esc(i.horizon)}<br/>` +
+              `<span class="t">${esc(i.effect)}</span><br/>` +
+              `<span class="m">${esc(c.event)} in ${esc(COUNTRY_BY_CODE[c.from].name)} → ${esc(i.targetAgent)} (${esc(DOMAIN_LABEL[i.domain])}). ${esc(i.mechanism)}.</span></div>`,
+            { maxWidth: 340 },
+          );
+          line.bindTooltip(esc(i.effect.slice(0, 80)), { sticky: true, opacity: 0.9 });
+          line.addTo(arcs);
+          lf.circleMarker([i.toLat, i.toLon], {
+            radius: 4,
+            color: colour,
+            weight: 2,
+            fillColor: "#070b12",
+            fillOpacity: 1,
+          }).addTo(arcs);
+        }
+      }
+    }
+
     if (show.alerts) {
       for (const a of alerts) {
         if (a.severity < 2) continue;
@@ -135,7 +190,7 @@ export default function IntelMap({ signals, alerts, country, focus }: Props) {
         markers.current.set(a.id, ring);
       }
     }
-  }, [ready, signals, alerts, show]);
+  }, [ready, signals, alerts, chains, show]);
 
   // Zoom to the selected country.
   useEffect(() => {
@@ -173,6 +228,7 @@ export default function IntelMap({ signals, alerts, country, focus }: Props) {
           [
             ["incidents", "Incidents"],
             ["alerts", "Fused alerts (rings)"],
+            ["arcs", "Knock-on arcs"],
             ["approx", "Country-level (approx.)"],
           ] as const
         ).map(([k, label]) => (
@@ -190,7 +246,7 @@ export default function IntelMap({ signals, alerts, country, focus }: Props) {
           ))}
         </div>
         <div className="text-slate-500">
-          {located}/{signals.length} pinned to a place · dashed = approximate
+          {located}/{signals.length} pinned to a place · dashed marker = approximate · dashed arc = projected, solid = verified
         </div>
       </div>
     </div>

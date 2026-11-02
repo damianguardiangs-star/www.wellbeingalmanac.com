@@ -194,7 +194,10 @@ const disasterRunner: Runner = async (self, c, ctx) => {
         source: "GDACS (UN/EC)",
         time: new Date(e.from).toISOString(),
         ...(e.lat != null && e.lon != null ? { lat: e.lat, lon: e.lon } : {}),
-        tags: [e.type.toLowerCase().replace("tropical cyclone", "typhoon")],
+        tags: [
+          e.type.toLowerCase().replace("tropical cyclone", "typhoon"),
+          ...(e.type === "Tropical cyclone" && e.name ? [`storm:${e.name.split("-")[0].toLowerCase()}`] : []),
+        ],
       });
     });
 };

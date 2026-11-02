@@ -41,3 +41,5 @@ body {
   0%, 100% { stroke-opacity: 1; stroke-width: 2.5; }
   50% { stroke-opacity: 0.25; stroke-width: 6; }
 }
+.intel-flow { stroke-dasharray: 10 6; animation: intel-flow 1.2s linear infinite; }
+@keyframes intel-flow { to { stroke-dashoffset: -16; } }
