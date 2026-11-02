@@ -25,6 +25,22 @@ const REGION_BOUNDS: [[number, number], [number, number]] = [
   [23.5, 141.5],
 ];
 
+/** Basemaps that need no API key. OpenStreetMap is darkened with a CSS filter to fit the dashboard. */
+const BASEMAPS = [
+  {
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+    className: "intel-tiles-dark",
+  },
+  {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
+    maxZoom: 16,
+    className: "",
+  },
+];
+
 export interface MapFocus {
   id: string;
   nonce: number;
@@ -80,12 +96,22 @@ export default function IntelMap({ signals, alerts, chains, country, focus }: Pr
       const lf = mod.default ?? mod;
       L.current = lf;
       const m = lf.map(el.current, { zoomControl: true, attributionControl: true, worldCopyJump: true, minZoom: 3 });
-      lf.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: "abcd",
-        maxZoom: 18,
-      }).addTo(m);
+      // Keyless basemaps, tried in order: if one keeps failing to load, switch to the next.
+      let provider = 0;
+      let failures = 0;
+      let layer: Leaflet.TileLayer | null = null;
+      const switchBasemap = (i: number) => {
+        const p = BASEMAPS[i];
+        layer?.remove();
+        failures = 0;
+        layer = lf.tileLayer(p.url, { attribution: p.attribution, maxZoom: p.maxZoom, className: p.className });
+        layer.on("tileerror", () => {
+          if (++failures >= 6 && provider < BASEMAPS.length - 1) switchBasemap(++provider);
+        });
+        layer.addTo(m);
+        layer.bringToBack();
+      };
+      switchBasemap(0);
       m.fitBounds(REGION_BOUNDS);
       layers.current = { arcs: lf.layerGroup().addTo(m), signals: lf.layerGroup().addTo(m), alerts: lf.layerGroup().addTo(m) };
       map.current = m;
