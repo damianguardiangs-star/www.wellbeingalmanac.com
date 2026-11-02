@@ -212,6 +212,7 @@ export function fuse(signals: Signal[], agents: Agent[], chains: ImpactChain[] =
       if (!t.startsWith("country:") && !CROSS_BORDER_TAG(t)) continue;
       // A Thai agent reporting on Cambodia and a Cambodian agent reporting on Thailand
       // describe the same bilateral situation, so both land in one "pair:" bucket.
+      if (t.startsWith("country:") && !["security", "geopolitics", "unrest", "infrastructure"].includes(s.domain)) continue;
       const key = t.startsWith("country:") ? `pair:${[s.country, t.slice(8)].sort().join("-")}` : t;
       (strongByTag.get(key) ?? strongByTag.set(key, []).get(key)!).push(s);
     }

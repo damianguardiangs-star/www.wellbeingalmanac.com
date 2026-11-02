@@ -244,6 +244,8 @@ export async function gdacsEvents(cache: SharedCache): Promise<GdacsEvent[]> {
           country?: string;
           affectedcountries?: { countryname: string }[];
           fromdate: string;
+          todate?: string;
+          iscurrent?: string | boolean;
           description?: string;
           url?: { report?: string };
         };
@@ -254,6 +256,9 @@ export async function gdacsEvents(cache: SharedCache): Promise<GdacsEvent[]> {
     for (const f of data.features ?? []) {
       const p = f.properties;
       const id = `${p.eventtype}-${p.eventid}`;
+      // Only events still running: the default listing also contains past events.
+      const ended = p.todate ? Date.now() - new Date(p.todate).getTime() > 7 * 86_400_000 : false;
+      if (String(p.iscurrent) === "false" || ended) continue;
       const point = f.geometry?.type === "Point" ? (f.geometry.coordinates as [number, number]) : undefined;
       const prev = seen.get(id);
       if (prev) {
