@@ -208,6 +208,7 @@ const HAZARD_TAGS: [RegExp, string][] = [
   [/landslide|mudslide/i, "landslide"],
   [/wildfire|forest fire|bushfire/i, "fire"],
   [/typhoon|cyclone|tropical storm/i, "typhoon"],
+  [/heavy rain|hail|storm surge|high tide/i, "storm"],
 ];
 
 /** GDACS for major declared events, plus local news for the floods, landslides and fires GDACS never flags. */
@@ -217,12 +218,11 @@ const disasterRunner: Runner = async (self, c, ctx) => {
   const out: Signal[] = [];
   if (gdacs.status === "fulfilled") out.push(...gdacs.value);
   if (news.status === "fulfilled")
-    out.push(
-      ...news.value.map((s) => ({
-        ...s,
-        tags: [...new Set([...s.tags, ...HAZARD_TAGS.filter(([re]) => re.test(s.title)).map(([, t]) => t)])],
-      })),
-    );
+    for (const s of news.value) {
+      const hazards = HAZARD_TAGS.filter(([re]) => re.test(s.title)).map(([, t]) => t);
+      if (!hazards.length) continue; // loose search match with no actual hazard in the headline
+      out.push({ ...s, tags: [...new Set([...s.tags, ...hazards])] });
+    }
   if (!out.length && gdacs.status === "rejected" && news.status === "rejected")
     throw new Error(`GDACS: ${gdacs.reason?.message ?? gdacs.reason}; news: ${news.reason?.message ?? news.reason}`);
   return out;
