@@ -1,0 +1,24 @@
+# Keeps 24/7 Gap Intel sweeping every 15 minutes, 24/7, so history and trends
+# build up even when nobody has the dashboard open. Free on GitHub Actions.
+# Setup: add repository secrets INTEL_SWEEP_URL (https://<your-domain>/api/intel/sweep)
+# and CRON_SECRET (same value as the CRON_SECRET env var on your deployment).
+name: intel-sweep
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Trigger sweep
+        env:
+          URL: ${{ secrets.INTEL_SWEEP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "INTEL_SWEEP_URL / CRON_SECRET secrets not set — skipping."
+            exit 0
+          fi
+          curl -fsS --max-time 320 -H "Authorization: Bearer $CRON_SECRET" "$URL"
