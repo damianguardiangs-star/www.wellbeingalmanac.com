@@ -131,7 +131,14 @@ export const ROLES: RoleConfig[] = [
   { domain: "weather", code: "WX", role: "Weather & severe-conditions watch" },
   { domain: "air", code: "AQ", role: "Air quality & haze monitor" },
   { domain: "seismic", code: "SEI", role: "Earthquake & volcano monitor" },
-  { domain: "disaster", code: "DIS", role: "Disaster alerts (floods, cyclones, fires)" },
+  {
+    domain: "disaster",
+    code: "DIS",
+    role: "Disaster alerts (floods, cyclones, fires)",
+    // Local events GDACS misses: flash floods, landslides, wildfires, evacuations.
+    query: (c) =>
+      `${c.name} ${or(["flood", "flash flood", "landslide", "wildfire", "forest fire", "evacuated", "typhoon", "storm surge"])}`,
+  },
   {
     domain: "crime",
     code: "CRM",

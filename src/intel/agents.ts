@@ -181,7 +181,7 @@ const seismicRunner: Runner = async (self, c, ctx) => {
     });
 };
 
-const disasterRunner: Runner = async (self, c, ctx) => {
+const gdacsRunner: Runner = async (self, c, ctx) => {
   const events = await gdacsEvents(ctx.cache);
   return events
     .filter((e) => c.aliases.some((a) => e.countries.toLowerCase().includes(a.toLowerCase())))
@@ -201,6 +201,31 @@ const disasterRunner: Runner = async (self, c, ctx) => {
         ],
       });
     });
+};
+
+const HAZARD_TAGS: [RegExp, string][] = [
+  [/flood/i, "flood"],
+  [/landslide|mudslide/i, "landslide"],
+  [/wildfire|forest fire|bushfire/i, "fire"],
+  [/typhoon|cyclone|tropical storm/i, "typhoon"],
+];
+
+/** GDACS for major declared events, plus local news for the floods, landslides and fires GDACS never flags. */
+const disasterRunner: Runner = async (self, c, ctx) => {
+  const role = ROLES.find((r) => r.domain === "disaster")!;
+  const [gdacs, news] = await Promise.allSettled([gdacsRunner(self, c, ctx), newsRunner(role)(self, c, ctx)]);
+  const out: Signal[] = [];
+  if (gdacs.status === "fulfilled") out.push(...gdacs.value);
+  if (news.status === "fulfilled")
+    out.push(
+      ...news.value.map((s) => ({
+        ...s,
+        tags: [...new Set([...s.tags, ...HAZARD_TAGS.filter(([re]) => re.test(s.title)).map(([, t]) => t)])],
+      })),
+    );
+  if (!out.length && gdacs.status === "rejected" && news.status === "rejected")
+    throw new Error(`GDACS: ${gdacs.reason?.message ?? gdacs.reason}; news: ${news.reason?.message ?? news.reason}`);
+  return out;
 };
 
 const fxRunner: Runner = async (self, c, ctx) => {
@@ -272,7 +297,7 @@ const STRUCTURED: Partial<Record<Domain, { run: Runner; sources: string[] }>> = 
   weather: { run: weatherRunner, sources: ["Open-Meteo"] },
   air: { run: airRunner, sources: ["Open-Meteo / CAMS"] },
   seismic: { run: seismicRunner, sources: ["USGS"] },
-  disaster: { run: disasterRunner, sources: ["GDACS"] },
+  disaster: { run: disasterRunner, sources: ["GDACS", "Google News", "Bing News (fallback)"] },
   currency: { run: fxRunner, sources: ["open.er-api.com"] },
   advisory: { run: advisoryRunner, sources: ["US State Dept", "UK FCDO"] },
   fusion: { run: async () => [], sources: ["Agent bus"] },
